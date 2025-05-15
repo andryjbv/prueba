@@ -1,0 +1,10 @@
+trigger: none
+
+extends:
+    template: /eng/pipelines/templates/stages/archetype-sdk-tests.yml
+    parameters:
+      PackageName: "@azure/service-bus"
+      ServiceDirectory: servicebus
+      TimeoutInMinutes: 120
+      EnvVars:
+        DEBUG: azure:service-bus:*,azure:core-amqp:*,rhea-promise:error,rhea:events,rhea:frames,rhea:io,rhea:flow

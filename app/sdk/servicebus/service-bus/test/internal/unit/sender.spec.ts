@@ -1,0 +1,142 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+import { ServiceBusMessageBatchImpl } from "../../../src/serviceBusMessageBatch.js";
+import type { ConnectionContext } from "../../../src/connectionContext.js";
+import type { ServiceBusMessage } from "../../../src/index.js";
+import { isServiceBusMessageBatch, ServiceBusSenderImpl } from "../../../src/sender.js";
+import { createConnectionContextForTests } from "./unittestUtils.js";
+import {
+  errorInvalidMessageTypeSingleOrArray,
+  errorInvalidMessageTypeSingle,
+  PartitionKeySessionIdMismatchError,
+} from "../../../src/util/errors.js";
+import { describe, it } from "vitest";
+import { assert } from "../../public/utils/chai.js";
+
+describe("Sender helper unit tests", () => {
+  it("isServiceBusMessageBatch", () => {
+    assert.isTrue(
+      isServiceBusMessageBatch(new ServiceBusMessageBatchImpl({} as ConnectionContext, 100)),
+    );
+
+    assert.isFalse(isServiceBusMessageBatch(undefined));
+    assert.isFalse(isServiceBusMessageBatch(4 as any as ServiceBusMessage));
+    assert.isFalse(isServiceBusMessageBatch({} as any as ServiceBusMessage));
+  });
+});
+
+describe("sender unit tests", () => {
+  const fakeContext = createConnectionContextForTests();
+  const sender = new ServiceBusSenderImpl(fakeContext, "fakeEntityPath", {}, "serviceBusClientId");
+  sender["_sender"].createBatch = async () => {
+    return new ServiceBusMessageBatchImpl(fakeContext, 100);
+  };
+
+  const partitionKeySessionIdMismatchMsg = {
+    body: "some body text",
+    sessionId: "my-sessionId",
+    partitionKey: "my-partitionKey",
+  };
+  const badMessages = [
+    "hello",
+    {},
+    123,
+    null,
+    undefined,
+    ["hello"],
+    partitionKeySessionIdMismatchMsg,
+  ];
+
+  badMessages.forEach((invalidValue) => {
+    it(`don't allow Sender.sendMessages(${invalidValue})`, async () => {
+      let expectedErrorMsg = errorInvalidMessageTypeSingleOrArray;
+      if (invalidValue === null || invalidValue === undefined) {
+        expectedErrorMsg = `Missing parameter "messages"`;
+      }
+      if (invalidValue === partitionKeySessionIdMismatchMsg) {
+        expectedErrorMsg = PartitionKeySessionIdMismatchError;
+      }
+
+      try {
+        await sender.sendMessages(
+          // @ts-expect-error We are trying invalid types on purpose to test the error thrown
+          invalidValue,
+        );
+        assert.fail("You should not be seeing this.");
+      } catch (err: any) {
+        assert.equal(err.name, "TypeError");
+        assert.equal(err.message, expectedErrorMsg);
+      }
+    });
+  });
+
+  badMessages.forEach((invalidValue) => {
+    it(`don't allow tryAdd(${invalidValue})`, async () => {
+      const batch = await sender.createMessageBatch();
+      let expectedErrorMsg = errorInvalidMessageTypeSingle;
+      if (invalidValue === null || invalidValue === undefined) {
+        expectedErrorMsg = `Missing parameter "message"`;
+      }
+      if (invalidValue === partitionKeySessionIdMismatchMsg) {
+        expectedErrorMsg = PartitionKeySessionIdMismatchError;
+      }
+
+      try {
+        batch.tryAddMessage(
+          // @ts-expect-error We are trying invalid types on purpose to test the error thrown
+          invalidValue,
+        );
+        assert.fail("You should not be seeing this.");
+      } catch (err: any) {
+        assert.equal(err.name, "TypeError");
+        assert.equal(err.message, expectedErrorMsg);
+      }
+    });
+  });
+
+  badMessages.forEach((invalidValue) => {
+    it(`don't allow Sender.scheduleMessages(${invalidValue})`, async () => {
+      let expectedErrorMsg = errorInvalidMessageTypeSingleOrArray;
+      if (invalidValue === null || invalidValue === undefined) {
+        expectedErrorMsg = `Missing parameter "messages"`;
+      }
+      if (invalidValue === partitionKeySessionIdMismatchMsg) {
+        expectedErrorMsg = PartitionKeySessionIdMismatchError;
+      }
+
+      try {
+        await sender.scheduleMessages(
+          // @ts-expect-error We are trying invalid types on purpose to test the error thrown
+          invalidValue,
+          new Date(),
+        );
+        assert.fail("You should not be seeing this.");
+      } catch (err: any) {
+        assert.equal(err.name, "TypeError");
+        assert.equal(err.message, expectedErrorMsg);
+      }
+    });
+  });
+
+  it("doesn't allow invalid enqueue time", async function () {
+    try {
+      await sender.scheduleMessages(
+        { body: "message" },
+        // @ts-expect-error We are trying invalid types on purpose to test the error thrown
+        "invalid date",
+      );
+      assert.fail("You should not be seeing this.");
+    } catch (err: any) {
+      assert.equal(err.name, "TypeError");
+      assert.equal(
+        err.message,
+        `The parameter "scheduledEnqueueTimeUtc" should be an instance of "Date"`,
+      );
+    }
+  });
+
+  it("should set source in created sender options", () => {
+    const options = sender["_sender"]["_createSenderOptions"]();
+    assert.equal(options.source, "serviceBusClientId");
+  });
+});

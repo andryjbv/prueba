@@ -1,0 +1,71 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+/**
+ * @file Testing the ts-naming-options rule.
+ *
+ */
+
+import { createRuleTester } from "../ruleTester.js";
+import rule from "../../src/rules/ts-naming-options.js";
+
+//------------------------------------------------------------------------------
+// Tests
+//------------------------------------------------------------------------------
+
+const ruleTester = createRuleTester();
+
+ruleTester.run("ts-naming-options", rule, {
+  valid: [
+    // single method
+    {
+      code: "class ExampleClient { createExample(options: CreateExampleOptions) {}; };",
+    },
+    // single method with default value
+    {
+      code: "class ExampleClient { createExample(options: CreateExampleOptions = {}) {}; };",
+    },
+    // OperationOptions is allowed
+    {
+      code: "class ExampleClient { public createExample(options: OperationOptions) {}; };",
+    },
+    // multiple methods
+    {
+      code: "class ExampleClient { createExample(options: CreateExampleOptions) {}; upsertExample(options: UpsertExampleOptions) {}; };",
+    },
+    // class constructor
+    {
+      code: "class ExampleClient { constructor(options: ExampleClientOptions) {}; };",
+    },
+    // not a client
+    {
+      code: "class Example { createExample(options: Options) {}; };",
+    },
+  ],
+  invalid: [
+    {
+      code: "class ExampleClient { createExample(options: Options) {}; };",
+      errors: [
+        {
+          message: "options parameter type is not prefixed with the method name",
+        },
+      ],
+    },
+    {
+      code: "class ExampleClient { createExample(options: Options = {}) {}; };",
+      errors: [
+        {
+          message: "options parameter type is not prefixed with the method name",
+        },
+      ],
+    },
+    {
+      code: "class ExampleClient { constructor(options: Options) {}; };",
+      errors: [
+        {
+          message: "options parameter type is not prefixed with the class name",
+        },
+      ],
+    },
+  ],
+});

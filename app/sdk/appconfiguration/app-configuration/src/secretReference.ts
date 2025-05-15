@@ -1,0 +1,91 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+import type { ConfigurationSetting, ConfigurationSettingParam } from "./models.js";
+import type { JsonSecretReferenceValue } from "./internal/jsonModels.js";
+import { logger } from "./logger.js";
+
+/**
+ * content-type for the secret reference.
+ */
+export const secretReferenceContentType =
+  "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8";
+
+/**
+ * Necessary fields for updating or creating a new secret reference.
+ */
+export interface SecretReferenceValue {
+  /**
+   * Id for the secret reference.
+   */
+  secretId: string;
+}
+
+/**
+ * @internal
+ */
+export const SecretReferenceHelper = {
+  /**
+   * Takes the SecretReference (JSON) and returns a ConfigurationSetting (with the props encodeed in the value).
+   */
+  toConfigurationSettingParam: (
+    secretReference: ConfigurationSettingParam<SecretReferenceValue>,
+  ): ConfigurationSettingParam => {
+    logger.info("Encoding SecretReference value in a ConfigurationSetting:", secretReference);
+    if (!secretReference.value) {
+      logger.error(`SecretReference has an unexpected value`, secretReference);
+      throw new TypeError(`SecretReference has an unexpected value - ${secretReference.value}`);
+    }
+
+    const jsonSecretReferenceValue: JsonSecretReferenceValue = {
+      uri: secretReference.value.secretId,
+    };
+
+    const configSetting = {
+      ...secretReference,
+      value: JSON.stringify(jsonSecretReferenceValue),
+    };
+    return configSetting;
+  },
+};
+
+/**
+ * Takes the ConfigurationSetting as input and returns the ConfigurationSetting<SecretReferenceValue> by parsing the value string.
+ */
+export function parseSecretReference(
+  setting: ConfigurationSetting,
+): ConfigurationSetting<SecretReferenceValue> {
+  logger.info(
+    "[parseSecretReference] Parsing the value to return the SecretReferenceValue",
+    setting,
+  );
+  if (!isSecretReference(setting)) {
+    logger.error("Invalid SecretReference input", setting);
+    throw TypeError(
+      `Setting with key ${setting.key} is not a valid SecretReference, make sure to have the correct content-type and a valid non-null value.`,
+    );
+  }
+
+  const jsonSecretReferenceValue = JSON.parse(setting.value) as JsonSecretReferenceValue;
+
+  const secretReference: ConfigurationSetting<SecretReferenceValue> = {
+    ...setting,
+    value: { secretId: jsonSecretReferenceValue.uri },
+  };
+  return secretReference;
+}
+
+/**
+ * Lets you know if the ConfigurationSetting is a secret reference.
+ *
+ * [Checks if the content type is secretReferenceContentType `"application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8"`]
+ */
+export function isSecretReference(
+  setting: ConfigurationSetting,
+): setting is ConfigurationSetting & Required<Pick<ConfigurationSetting, "value">> {
+  return (
+    setting &&
+    setting.contentType === secretReferenceContentType &&
+    typeof setting.value === "string"
+  );
+}

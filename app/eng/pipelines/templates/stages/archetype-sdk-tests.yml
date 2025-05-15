@@ -1,0 +1,110 @@
+parameters:
+  - name: PackageName
+    type: string
+    default: ''
+  - name: ServiceDirectory
+    type: string
+    default: ''
+  - name: TestResourceDirectories
+    type: object
+    default:
+  - name: EnvVars
+    type: object
+    default: {}
+  - name: MaxParallel
+    type: number
+    default: 0
+  - name: TimeoutInMinutes
+    type: number
+    default: 60
+  - name: PublishCodeCoverage
+    type: boolean
+    default: false
+  - name: Location
+    type: string
+    default: ''
+  - name: Clouds
+    type: string
+    default: Public
+  - name: SupportedClouds
+    type: string
+    default: Public
+  - name: UnsupportedClouds
+    type: string
+    default: ''
+  - name: PreSteps
+    type: object
+    default: []
+  - name: PostSteps
+    type: object
+    default: []
+  - name: CloudConfig
+    type: object
+    default:
+      Public:
+      # Canary regions are currently not supported in TME so disabling for now
+      # Canary:
+      #   Location: centraluseuap
+      #   MatrixFilters:
+      #     - OSVmImage=.*Ubuntu.*
+      #     - DependencyVersion=^$
+  - name: MatrixConfigs
+    type: object
+    default:
+      - Name: Js_live_test_base
+        Path: eng/pipelines/templates/stages/platform-matrix.json
+        Selection: sparse
+        GenerateVMJobs: true
+  - name: AdditionalMatrixConfigs
+    type: object
+    default: []
+  - name: MatrixFilters
+    type: object
+    default: []
+  - name: MatrixReplace
+    type: object
+    default: []
+  - name: UseFederatedAuth
+    type: boolean
+    default: true
+  - name: PersistOidcToken
+    type: boolean
+    default: false
+
+
+extends:
+  template: /eng/pipelines/templates/stages/1es-redirect.yml
+  parameters:
+    stages:
+      - template: archetype-sdk-tests-isolated.yml@self
+        parameters:
+          PackageName: ${{ parameters.PackageName }}
+          ServiceDirectory: ${{ parameters.ServiceDirectory }}
+          TestResourceDirectories: ${{ parameters.TestResourceDirectories }}
+          EnvVars: ${{ parameters.EnvVars }}
+          MaxParallel: ${{ parameters.MaxParallel }}
+          TimeoutInMinutes: ${{ parameters.TimeoutInMinutes }}
+          PublishCodeCoverage: ${{ parameters.PublishCodeCoverage }}
+          Location: ${{ parameters.Location }}
+          Clouds: ${{ parameters.Clouds }}
+          SupportedClouds: ${{ parameters.SupportedClouds }}
+          UnsupportedClouds: ${{ parameters.UnsupportedClouds }}
+          UseFederatedAuth: ${{ parameters.UseFederatedAuth }}
+          PersistOidcToken: ${{ parameters.PersistOidcToken }}
+          PreSteps:
+            - ${{ parameters.PreSteps }}
+          PostSteps:
+            - ${{ parameters.PostSteps }}
+          CloudConfig: ${{ parameters.CloudConfig }}
+          MatrixConfigs:
+            - ${{ each config in parameters.MatrixConfigs }}:
+              - ${{ config }}
+          AdditionalMatrixConfigs:
+            - ${{ each config in parameters.AdditionalMatrixConfigs }}:
+              - ${{ config }}
+          MatrixFilters:
+            - ${{ each config in parameters.MatrixFilters }}:
+              - ${{ config }}
+          MatrixReplace:
+            - ${{ each config in parameters.MatrixReplace }}:
+              - ${{ config }}

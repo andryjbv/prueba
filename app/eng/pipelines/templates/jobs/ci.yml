@@ -1,0 +1,97 @@
+parameters:
+  - name: Artifacts
+    type: object
+    default: []
+  - name: TestPipeline
+    type: boolean
+    default: false
+  - name: TestProxy
+    type: boolean
+    default: true
+  - name: ServiceDirectory
+    type: string
+    default: not-specified
+  - name: RunUnitTests
+    type: boolean
+    default: true
+  - name: MatrixConfigs
+    type: object
+  - name: MatrixFilters
+    type: object
+    default: []
+  - name: MatrixReplace
+    type: object
+    default: []
+  - name: IncludeRelease
+    type: boolean
+    default: true
+
+jobs:
+  - job: "Build"
+
+    ${{ if and(eq(variables['Build.Reason'], 'PullRequest'), eq(parameters.ServiceDirectory, 'auto')) }}:
+      timeoutInMinutes: 240
+
+    pool:
+      name: $(LINUXPOOL)
+      image: $(LINUXVMIMAGE)
+      os: linux
+
+    steps:
+      - script: |
+          echo "##vso[build.addbuildtag]Scheduled"
+        displayName: "Tag scheduled builds"
+        condition: and(always(),and(eq(variables['Build.SourceBranchName'],'main'),eq(variables['Build.Reason'],'Schedule')))
+
+      - template: ../steps/common.yml
+
+      - template: ../steps/build.yml
+        parameters:
+          Artifacts: ${{ parameters.Artifacts }}
+          ServiceDirectory: ${{ parameters.ServiceDirectory }}
+          TestPipeline: ${{ parameters.TestPipeline }}
+          IncludeRelease: ${{ parameters.IncludeRelease }}
+
+  - job: "Analyze"
+
+    ${{ if and(eq(variables['Build.Reason'], 'PullRequest'), eq(parameters.ServiceDirectory, 'auto')) }}:
+      timeoutInMinutes: 240
+
+    pool:
+      name: $(LINUXPOOL)
+      image: $(LINUXVMIMAGE)
+      os: linux
+
+    steps:
+      - template: ../steps/common.yml
+
+      - template: ../steps/analyze.yml
+        parameters:
+          Artifacts: ${{ parameters.Artifacts }}
+          ServiceDirectory: ${{ parameters.ServiceDirectory }}
+          TestPipeline: ${{ parameters.TestPipeline }}
+
+  - ${{ if ne(parameters.RunUnitTests, false) }}:
+      - template: /eng/common/pipelines/templates/jobs/generate-job-matrix.yml
+        parameters:
+          JobTemplatePath: /eng/pipelines/templates/jobs/ci.tests.yml
+          OsVmImage: $(LINUXVMIMAGE)
+          Pool: $(LINUXPOOL)
+          MatrixConfigs: ${{ parameters.MatrixConfigs }}
+          MatrixFilters: ${{ parameters.MatrixFilters }}
+          MatrixReplace: ${{ parameters.MatrixReplace }}
+          ${{ if eq(parameters.ServiceDirectory, 'auto') }}:
+            SparseCheckoutPaths: [ "/*" ]
+          CloudConfig:
+            Cloud: Public
+          AdditionalParameters:
+            ServiceDirectory: ${{ parameters.ServiceDirectory }}
+            Artifacts: ${{ parameters.Artifacts }}
+            TestProxy: ${{ parameters.TestProxy }}
+          ${{ if eq(parameters.ServiceDirectory, 'auto') }}:
+            EnablePRGeneration: true
+            PRMatrixSparseIndirect: false
+            PreGenerationSteps:
+              - template: /eng/common/pipelines/templates/steps/save-package-properties.yml
+                parameters:
+                  ServiceDirectory: ${{parameters.ServiceDirectory}}

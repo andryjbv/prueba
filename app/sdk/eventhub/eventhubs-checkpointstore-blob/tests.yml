@@ -1,0 +1,10 @@
+trigger: none
+
+extends:
+    template: /eng/pipelines/templates/stages/archetype-sdk-tests.yml
+    parameters:
+      PackageName: "@azure/eventhubs-checkpointstore-blob"
+      ServiceDirectory: eventhub
+      MatrixFilters:
+        - TestType=^(?!sample).*
+        - DependencyVersion=^$

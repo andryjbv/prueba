@@ -1,0 +1,167 @@
+parameters:
+  - name: Daily
+    type: boolean
+    default: true
+  - name: ServiceDirectory
+    type: string
+    default: ""
+  - name: Artifact
+    type: object
+    default: {}
+  - name: ArtifactName
+    type: string
+    default: 'not-specified'
+
+jobs:
+  - ${{ if and(eq(parameters.Daily, false), ne(variables['Skip.Release'], 'true')) }}:
+    - job: smoke_test_eligibility
+      variables:
+        - template: /eng/pipelines/templates/variables/globals.yml
+      pool:
+        name: "azsdk-pool-mms-ubuntu-2004-general"
+        vmImage: "MMSUbuntu20.04"
+      displayName: Check Smoke Test Eligibility
+      steps:
+        - template: /eng/pipelines/templates/steps/use-node-version.yml
+
+        # As of npm v7, "npm install -g" no longer installs local dependencies as part of the global install.
+        # As a workaround, we run "npm install --prod" before "npm install -g".
+        # https://github.com/npm/cli/issues/2968
+        - pwsh: npm install --prod; npm install -g
+          workingDirectory: $(Build.SourcesDirectory)/common/tools/dev-tool
+          displayName: Install dev-tool
+
+        - pwsh: |
+            $(Build.SourcesDirectory)/eng/common/scripts/Import-AzModules.ps1
+
+            ./Initialize-SmokeTests.ps1 -DryRun -CI -Verbose -ServiceDirectory ${{ parameters.ServiceDirectory }}
+            if (-not (Test-Path ./run-manifest.json)) {
+              exit
+            }
+            $packages = Get-Content ./run-manifest.json | ConvertFrom-Json
+            $packages | ForEach-Object {
+              if ($_) {
+                Write-Host "Smoke tests will run for $($_.Name)"
+                Write-Host "##vso[task.setvariable variable=RunSmokeTests;isOutput=true;]true"
+              }
+            }
+          name: check_smoke_tests
+          displayName: Check smoke test eligibility for ${{ parameters.ServiceDirectory }}
+          workingDirectory: $(Build.SourcesDirectory)/common/smoke-test
+
+  - job: SmokeTest
+    ${{ if and(eq(parameters.Daily, false), ne(variables['Skip.Release'], 'true')) }}:
+      dependsOn: smoke_test_eligibility
+      condition: and(succeeded(), eq(dependencies.smoke_test_eligibility.outputs['check_smoke_tests.RunSmokeTests'], true))
+    strategy:
+      matrix:
+        Mac Node18 (AzureCloud):
+          Pool: Azure Pipelines
+          OSVmImage: "macos-latest"
+          NodeTestVersion: "18.x"
+        Windows Node20 (AzureCloud):
+          Pool: "azsdk-pool-mms-win-2022-general"
+          OSVmImage: "MMS2022"
+          NodeTestVersion: "20.x"
+        Linux Node18 (AzureCloud):
+          Pool: "azsdk-pool-mms-ubuntu-2004-general"
+          OSVmImage: "MMSUbuntu20.04"
+          NodeTestVersion: "18.x"
+        Linux Node20 (AzureCloud):
+          Pool: "azsdk-pool-mms-ubuntu-2004-general"
+          OSVmImage: "MMSUbuntu20.04"
+          NodeTestVersion: "20.x"
+
+    pool:
+      name: $(Pool)
+      vmImage: $(OSVmImage)
+
+    variables:
+      - template: /eng/pipelines/templates/variables/globals.yml
+
+    steps:
+      - template: /eng/pipelines/templates/steps/common.yml
+
+        # As of npm v7, "npm install -g" no longer installs local dependencies as part of the global install.
+        # As a workaround, we run "npm install --prod" before "npm install -g".
+        # https://github.com/npm/cli/issues/2968
+      - pwsh: npm install --prod; npm install -g
+        workingDirectory: $(Build.SourcesDirectory)/common/tools/dev-tool
+        displayName: Install dev-tool
+
+      - download: current
+        artifact: ${{parameters.ArtifactName}}
+        condition: and(succeeded(), ne('${{ parameters.Daily }}', 'true'))
+
+      - pwsh: |
+          $(Build.SourcesDirectory)/eng/common/scripts/Import-AzModules.ps1
+           
+          # TODO: When we re-enable this pipeline we will need to refactor to use federated auth for deployment
+          $subscriptionConfiguration = @"
+            $(SubscriptionConfiguration)
+          "@ | ConvertFrom-Json -AsHashtable;
+
+          if ([System.Convert]::ToBoolean("${{ parameters.Daily }}")) {
+            ./Initialize-SmokeTests.ps1 `
+              -CI `
+              -Verbose `
+              -Location '$(Location)' `
+              -Daily `
+              @subscriptionConfiguration `
+              -AdditionalParameters $(ArmTemplateParameters)
+          } else {
+            $packageArtifact = Get-ChildItem $(Pipeline.Workspace)/${{parameters.ArtifactName}}/${{parameters.Artifact.name}}/*.tgz
+            if ($packageArtifact.name -notmatch "${{parameters.Artifact.name}}") {
+              Write-Error "Package name mismatch: expecting ${{parameters.Artifact.name}}, found $packageArtifact.name"
+              exit 1
+            }
+            if ($packageArtifact.count -ne 1) {
+              Write-Error "Got $packageArtifact.count packages, expecting 1."
+              exit 1
+            }
+            $result = $(System.DefaultWorkingDirectory)/eng/scripts/get-npm-tags.ps1 -packageArtifact $packageArtifact -workingDirectory $(System.DefaultWorkingDirectory)/temp
+            $packageInfo = Get-Content -Path "$(Pipeline.Workspace)/${{parameters.ArtifactName}}/PackageInfo/${{parameters.Artifact.name}}.json" 
+              | ConvertFrom-Json -AsHashtable
+
+            ./Initialize-SmokeTests.ps1 `
+              -CI `
+              -Verbose `
+              -Location '$(Location)' `
+              -TagOverride $result.Tag `
+              -TagOverridePackages $packageInfo.Name `
+              -ServiceDirectory ${{ parameters.ServiceDirectory }} `
+              @subscriptionConfiguration `
+              -AdditionalParameters $(ArmTemplateParameters)
+          }
+
+        workingDirectory: $(Build.SourcesDirectory)/common/smoke-test
+        displayName: Deploy Smoke Test resources and prepare samples
+
+      - pwsh: Get-Content ./run-manifest.json
+        workingDirectory: $(Build.SourcesDirectory)/common/smoke-test
+        displayName: Print run manifest
+
+      - template: /eng/pipelines/templates/steps/use-node-version.yml
+        parameters:
+          NodeVersion: $(NodeTestVersion)
+
+      - task: Npm@1
+        inputs:
+          command: install
+          workingDir: common/smoke-test/
+        displayName: Install packages
+
+      - task: Npm@1
+        inputs:
+          command: custom
+          customCommand: "list --depth=0"
+          workingDir: common/smoke-test/
+        displayName: List packages installed from the feed
+
+      - script: npm run smoke-test -- --devops-logging
+        workingDirectory: common/smoke-test/
+        displayName: Run smoke tests
+
+      - template: /eng/common/TestResources/remove-test-resources.yml
+        parameters:
+          ServiceConnection: azure-sdk-tests-public

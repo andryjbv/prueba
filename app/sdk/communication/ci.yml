@@ -1,0 +1,67 @@
+trigger:
+  branches:
+    include:
+      - main
+      - release/*
+      - hotfix/*
+  paths:
+    include:
+      - sdk/communication/
+    exclude:
+      - sdk/communication/ci.mgmt.yml
+      - sdk/communication/arm-communication
+pr:
+  branches:
+    include:
+      - main
+      - feature/*
+      - release/*
+      - hotfix/*
+    exclude:
+      - feature/v4
+  paths:
+    include:
+      - sdk/communication/
+    exclude:
+      - sdk/communication/ci.mgmt.yml
+      - sdk/communication/arm-communication
+
+extends:
+  template: ../../eng/pipelines/templates/stages/archetype-sdk-client.yml
+  parameters:
+    ServiceDirectory: communication
+    Artifacts:
+      - name: azure-communication-common
+        safeName: azurecommunicationcommon
+      - name: azure-communication-sms
+        safeName: azurecommunicationsms
+      - name: azure-communication-chat
+        safeName: azurecommunicationchat
+      - name: azure-communication-email
+        safeName: azurecommunicationemail
+      - name: azure-communication-identity
+        safeName: azurecommunicationidentity
+      - name: azure-communication-phone-numbers
+        safeName: azurecommunicationphonenumbers
+      - name: azure-tools-communication-short-codes
+        safeName: azuretoolscommunicationshortcodes
+      - name: azure-tools-communication-alpha-ids
+        safeName: azuretoolscommunicationalphaids
+      - name: azure-communication-rooms
+        safeName: azurecommunicationrooms
+      - name: azure-rest-communication-job-router
+        safeName: azurerestcommunicationjobrouter
+      - name: azure-rest-communication-messages
+        safeName: azurerestcommunicationmessages
+      - name: azure-tools-communication-toll-free-verification
+        safeName: azuretoolscommunicationtollfreeverification
+      - name: azure-communication-call-automation
+        safeName: azurecommunicationcallautomation
+      - name: azure-tools-communication-recipient-verification
+        safeName: azuretoolscommunicationrecipientverification
+        skipPublishDocMs: true
+        skipPublishDocGithubIo: true
+      - name: azure-tools-communication-tiering
+        safeName: azuretoolscommunicationtiering
+        skipPublishDocMs: true
+        skipPublishDocGithubIo: true

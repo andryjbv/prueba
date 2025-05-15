@@ -1,0 +1,16 @@
+trigger: none
+
+extends:
+    template: /eng/pipelines/templates/stages/archetype-sdk-tests.yml
+    parameters:
+      PackageName: "@azure/storage-blob"
+      ServiceDirectory: storage
+      TimeoutInMinutes: 90
+      Location: canadacentral
+      MatrixFilters:
+        - DependencyVersion=^$
+      MatrixConfigs:
+        - Name: Storage_live_test_base
+          Path: sdk/storage/storage-blob/platform-matrix.json
+          Selection: sparse
+          GenerateVMJobs: true

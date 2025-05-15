@@ -1,0 +1,15 @@
+trigger: none
+
+extends:
+    template: /eng/pipelines/templates/stages/archetype-sdk-tests.yml
+    parameters:
+      PackageName: "@azure/communication-sms"
+      ServiceDirectory: communication
+      CloudConfig:
+        Public:
+          SubscriptionConfigurations:
+            - $(sub-config-communication-services-cloud-test-resources-common)
+            - $(sub-config-communication-services-cloud-test-resources-js)
+            - $(sub-config-communication-services-sms-cloud-test-resources)
+      TestResourceDirectories:
+        - communication/test-resources/

@@ -1,0 +1,88 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+/**
+ * This sample demonstrates how to analyze user query using an orchestration project.
+ * In this sample, orchestration project's top intent will map to a Qna project.
+ *
+ * @summary Orchestration project with direct target
+ */
+
+import type { ConversationalTask } from "@azure/ai-language-conversations";
+import { ConversationAnalysisClient } from "@azure/ai-language-conversations";
+import { DefaultAzureCredential } from "@azure/identity";
+import "dotenv/config";
+
+const cluEndpoint =
+  process.env.LANGUAGE_ENDPOINT || "https://dummyendpoint.cognitiveservices.azure.com";
+const projectName = process.env.AZURE_CONVERSATIONS_WORKFLOW_PROJECT_NAME || "<project-name>";
+const deploymentName =
+  process.env.AZURE_CONVERSATIONS_WORKFLOW_DEPLOYMENT_NAME || "<deployment-name>";
+
+const service: ConversationAnalysisClient = new ConversationAnalysisClient(
+  cluEndpoint,
+  new DefaultAzureCredential(),
+);
+
+const query = "How are you?";
+const qnaApp = "ChitChat-QnA";
+
+const body: ConversationalTask = {
+  kind: "Conversation",
+  analysisInput: {
+    conversationItem: {
+      participantId: "1",
+      id: "1",
+      modality: "text",
+      language: "en",
+      text: query,
+    },
+  },
+  parameters: {
+    projectName: projectName,
+    deploymentName: deploymentName,
+    isLoggingEnabled: false,
+    directTarget: qnaApp,
+    targetProjectParameters: {
+      "ChitChat-QnA": {
+        targetProjectKind: "QuestionAnswering",
+        callingOptions: {
+          question: query,
+        },
+      },
+    },
+  },
+};
+
+export async function main(): Promise<void> {
+  // Analyze query
+  const { result } = await service.analyzeConversation(body);
+  console.log("query: ", result.query);
+  console.log("project kind: ", result.prediction.projectKind);
+
+  const topIntent = result.prediction.topIntent || "None";
+  console.log("\ntop intent: ", topIntent);
+
+  const prediction = result.prediction;
+  if (prediction.projectKind === "Orchestration") {
+    const topIntentObject = prediction.intents[topIntent];
+    console.log("confidence score: ", topIntentObject.confidence);
+    console.log("project kind: ", topIntentObject.targetProjectKind);
+
+    if (topIntentObject.targetProjectKind === "QuestionAnswering") {
+      console.log("\nqna response:");
+
+      const qnaResponse = topIntentObject.result;
+      if (qnaResponse && qnaResponse.answers) {
+        for (const answer of qnaResponse.answers) {
+          console.log("\nanswer: ", answer.answer);
+          console.log("confidence score: ", answer.confidence);
+        }
+      }
+    }
+  }
+}
+
+main().catch((err) => {
+  console.error("The sample encountered an error:", err);
+});

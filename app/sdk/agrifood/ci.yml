@@ -1,0 +1,34 @@
+# NOTE: Please refer to https://aka.ms/azsdk/engsys/ci-yaml before editing this file.
+                
+trigger:
+  branches:
+    include:
+      - main
+      - release/*
+      - hotfix/*
+  paths:
+    include:
+      - sdk/agrifood/
+    exclude:
+      - sdk/agrifood/arm-agrifood
+      - sdk/agrifood/ci.mgmt.yml
+pr:
+  branches:
+    include:
+      - main
+      - feature/*
+      - release/*
+      - hotfix/*
+  paths:
+    include:
+      - sdk/agrifood/
+    exclude:
+      - sdk/agrifood/arm-agrifood
+      - sdk/agrifood/ci.mgmt.yml
+extends:
+  template: ../../eng/pipelines/templates/stages/archetype-sdk-client.yml
+  parameters:
+    ServiceDirectory: agrifood
+    Artifacts:
+      - name: azure-rest-agrifood-farming
+        safeName: azurerestagrifoodfarming

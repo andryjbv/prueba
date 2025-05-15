@@ -1,0 +1,11 @@
+trigger: none
+
+extends:
+    template: /eng/pipelines/templates/stages/archetype-sdk-tests.yml
+    parameters:
+      PackageName: "@azure/storage-file-share"
+      ServiceDirectory: storage
+      TimeoutInMinutes: 90
+      Location: canadacentral
+      MatrixFilters:
+        - DependencyVersion=^$

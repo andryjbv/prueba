@@ -1,0 +1,10 @@
+trigger: none
+
+extends:
+    template: /eng/pipelines/templates/stages/archetype-sdk-tests.yml
+    parameters:
+      PackageName: "@azure/data-tables"
+      ServiceDirectory: tables
+      MatrixFilters:
+        - DependencyVersion=^$
+      SupportedClouds: 'Public'

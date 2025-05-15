@@ -1,0 +1,8 @@
+trigger: none
+
+extends:
+    template: /eng/pipelines/templates/stages/archetype-sdk-tests.yml
+    parameters:
+      PackageName: "@azure/keyvault-secrets"
+      ServiceDirectory: keyvault
+      TimeoutInMinutes: 59

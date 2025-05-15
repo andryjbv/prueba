@@ -1,8 +1,0 @@
-{
-  "extends": ["./tsconfig.src.json", "../../../tsconfig.test.base.json"],
-  "compilerOptions": {
-    "paths": {
-      "@azure-rest/agrifood-farming": ["./src/index.ts"]
-    }
-  }
-}

@@ -1,6 +1,0 @@
-{
-  "compilerOptions": {
-    "strict": true
-  },
-  "include": ["tsconfig.json", "not_package.json"]
-}

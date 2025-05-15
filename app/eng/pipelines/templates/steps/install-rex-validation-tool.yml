@@ -1,4 +1,0 @@
-steps:
-  - pwsh: |
-      npm install -g "@microsoft/type2docfx@$(Get-Content eng/scripts/docs/type2docfx.version.txt)"
-    displayName: Install @microsoft/type2docfx for package validation

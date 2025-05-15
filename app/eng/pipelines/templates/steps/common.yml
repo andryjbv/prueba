@@ -1,6 +1,0 @@
-steps:
-  - template: /eng/common/pipelines/templates/steps/verify-agent-os.yml
-    parameters:
-      AgentImage: $(OSVmImage)
-
-  - template: use-node-version.yml
